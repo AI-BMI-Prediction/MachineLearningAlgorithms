@@ -2,9 +2,9 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.python.keras.models import Sequential
-from keras.layers import LSTM
 from tensorflow.python.keras.layers import Dense,Dropout,Activation
 from tensorflow.python.keras import metrics
+from keras.layers import LSTM
 from sklearn.preprocessing import StandardScaler
 from tensorflow.python import keras
 import tensorflow as tf
@@ -16,8 +16,8 @@ import keras.backend as K
 
 data = pd.read_excel('Continous_2weeks_2day_1term.xlsx')
 
-X = data.iloc[:, [1, 3, 4, 5, 6, 7]]
-y = data.iloc[:, [-1]]
+X = data.iloc[:,[1,3,4,5,6,7]]
+y = data.iloc[:,-1]
 
 scaler = StandardScaler()
 X = scaler.fit_transform(X)
@@ -30,6 +30,7 @@ pred_list = []
 #한 사람당 데이터 수
 Count_1 = int(181*0.1)
 #한 사람당 데이터 수
+
 Count_2 = 181
 
 X_test = pd.DataFrame()
@@ -41,14 +42,16 @@ empty = pd.DataFrame()
 #결과 넣을 배열
 Result = [[0 for j in range(4)] for i in range(10)]
 
+
 K.clear_session()
 model = Sequential()
-model.add(LSTM(6, input_shape=(6,1)))
-model.add(Dense(1, activation='softmax'))
+#input_shpae(time_step, daata_dim)
+model.add(LSTM(32, input_shape=(6,6),return_sequences=True ))
+model.add(LSTM(32))
+model.add(Dense(3, activation='softmax'))
 model.compile(loss=tf.keras.losses.CategoricalCrossentropy(),
               optimizer='adam',
               metrics=['accuracy'])
-
 
 
 for i in range(10):
@@ -82,30 +85,35 @@ for i in range(10):
     X_train = X_train.values
     X_test = X_test.values
     #y_train = y_train.values
-    y_test = y_test.values
+    #y_test = y_test.values
 
     X_train = X_train.reshape(X_train.shape[0], 6, 1)
     X_test = X_test.reshape(X_test.shape[0], 6, 1)
 
     # 원핫인코딩
     # 예시 : 1 , 2 -> (1,0) , (0,1)
-    #y_train = pd.get_dummies(y_train[0])
-    #y_test = pd.get_dummies(y_test[0])
 
-    #print(y_train)
-    print(y_train)
+    print(y_train.shape)
+    #y_train = pd.get_dummies(y_train)
+    #y_test = pd.get_dummies(y_test)
 
-    y_train = pd.get_dummies(y_train[0])
-    #y_test = pd.get_dummies(y_test[0])
+
+    y_train = tf.keras.utils.to_categorical(y_train)
+    y_test = tf.keras.utils.to_categorical(y_test)
+
 
     history = model.fit(X_train, y_train, epochs=100, validation_data=(X_test,y_test), batch_size=18)
+    model.summary()
     predicted = model.predict(X_test)
-    results = model.evaluate(X_test, y_test, batch_size=8)
+    results = model.evaluate(X_test, y_test, batch_size=18)
     print("[{}]Accuracy : {}".format(i, results[1]))
 
+
     predicted = pd.DataFrame(predicted)
+    y_test = pd.DataFrame(y_test)
     predicted = predicted.idxmax(axis=1)
     y_test = y_test.idxmax(axis=1)
+
 
     print("predicted", predicted)
     print("y_test", y_test)
@@ -126,6 +134,19 @@ for i in range(10):
     del results
     del f1
     del p_rlist
+
+    from sklearn.metrics import confusion_matrix
+    from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+    import matplotlib.pyplot as plt
+
+    confusion_matrix(y_test, predicted)
+
+    cm = confusion_matrix(y_test, predicted, labels=[0, 1, 2], normalize="true")
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=[0, 1, 2])
+    disp.plot()
+    filename = ("ConfusionMatrix_" + str(i))
+    plt.savefig(filename + ".png")
+
 
 Result_df=pd.DataFrame(Result,columns=['Accuracy','F1-Score','Precision','Recall'])
 Result_df
